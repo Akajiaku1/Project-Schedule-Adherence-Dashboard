@@ -1,0 +1,6 @@
+Task,Start_Date,Planned_End_Date,Actual_End_Date,Progress,Phase
+Requirement Gathering,2025-01-01,2025-01-10,2025-01-09,100,Initiation
+Design,2025-01-11,2025-01-20,2025-01-23,100,Planning
+Development,2025-01-21,2025-02-15,2025-02-18,80,Execution
+Testing,2025-02-16,2025-02-28,2025-02-25,50,Execution
+Deployment,2025-03-01,2025-03-05,2025-03-07,30,Closure
