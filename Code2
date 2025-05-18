@@ -1,0 +1,101 @@
+import pandas as pd
+import dash
+from dash import dcc, html, Output, Input
+import plotly.express as px
+import dash_bootstrap_components as dbc
+
+# Load Data
+df = pd.read_csv("data/project_schedule.csv", parse_dates=["Start_Date", "Planned_End_Date", "Actual_End_Date"])
+df["Planned_Duration"] = (df["Planned_End_Date"] - df["Start_Date"]).dt.days
+df["Actual_Duration"] = (df["Actual_End_Date"] - df["Start_Date"]).dt.days
+df["Adherence"] = df["Actual_End_Date"] <= df["Planned_End_Date"]
+
+# App Setup
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app.title = "Project Schedule Adherence Dashboard"
+
+# Layout
+app.layout = dbc.Container([
+    html.H2("📊 Project Schedule Adherence Dashboard", className="text-center my-4"),
+
+    dbc.Row([
+        dbc.Col([
+            html.Label("Filter by Phase:"),
+            dcc.Dropdown(
+                id="phase-filter",
+                options=[{"label": phase, "value": phase} for phase in df["Phase"].unique()],
+                value=None,
+                placeholder="Select a Phase",
+                clearable=True
+            )
+        ], width=4),
+
+        dbc.Col([
+            html.Br(),
+            html.Button("🖨️ Export Report (Use Browser's Print to PDF)", id="export-button", className="btn btn-secondary")
+        ], width=8, className="text-end")
+    ], className="mb-4"),
+
+    dbc.Row([
+        dbc.Col(dbc.Card([
+            dbc.CardBody([
+                html.H5("Total Tasks", className="card-title"),
+                html.H3(id="total-tasks")
+            ])
+        ]), width=4),
+
+        dbc.Col(dbc.Card([
+            dbc.CardBody([
+                html.H5("On-Time Tasks", className="card-title"),
+                html.H3(id="on-time-tasks")
+            ])
+        ]), width=4),
+
+        dbc.Col(dbc.Card([
+            dbc.CardBody([
+                html.H5("Schedule Adherence (%)", className="card-title"),
+                html.H3(id="adherence-rate")
+            ])
+        ]), width=4),
+    ], className="mb-4"),
+
+    dcc.Graph(id="duration-bar-chart"),
+    dcc.Graph(id="gantt-chart"),
+
+    html.H4("Task Completion Progress", className="mt-4"),
+    dcc.Graph(id="progress-chart")
+], fluid=True)
+
+# Callback
+@app.callback(
+    Output("total-tasks", "children"),
+    Output("on-time-tasks", "children"),
+    Output("adherence-rate", "children"),
+    Output("duration-bar-chart", "figure"),
+    Output("gantt-chart", "figure"),
+    Output("progress-chart", "figure"),
+    Input("phase-filter", "value")
+)
+def update_dashboard(selected_phase):
+    filtered = df[df["Phase"] == selected_phase] if selected_phase else df
+
+    total = len(filtered)
+    on_time = filtered["Adherence"].sum()
+    adherence = f"{(filtered['Adherence'].mean() * 100):.2f}%" if total else "0%"
+
+    bar_fig = px.bar(filtered, x="Task", y=["Planned_Duration", "Actual_Duration"],
+                     barmode="group", title="Planned vs Actual Duration per Task")
+
+    gantt_fig = px.timeline(filtered, x_start="Start_Date", x_end="Actual_End_Date", y="Task", color="Adherence",
+                            title="Gantt Chart with Schedule Adherence")
+    gantt_fig.update_yaxes(autorange="reversed")
+
+    progress_fig = px.bar(filtered, x="Task", y="Progress", color="Progress",
+                          title="Task Completion Progress (%)", text="Progress")
+    progress_fig.update_traces(texttemplate='%{text}%', textposition='outside')
+
+    return total, on_time, adherence, bar_fig, gantt_fig, progress_fig
+
+# Run App
+if __name__ == "__main__":
+    app.run_server(debug=True)
