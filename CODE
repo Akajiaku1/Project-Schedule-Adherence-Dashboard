@@ -1,0 +1,60 @@
+import pandas as pd
+import dash
+from dash import dcc, html
+import plotly.express as px
+import dash_bootstrap_components as dbc
+
+# Load Data
+df = pd.read_csv("data/project_schedule.csv", parse_dates=["Start_Date", "Planned_End_Date", "Actual_End_Date"])
+
+# Calculate additional metrics
+df["Planned_Duration"] = (df["Planned_End_Date"] - df["Start_Date"]).dt.days
+df["Actual_Duration"] = (df["Actual_End_Date"] - df["Start_Date"]).dt.days
+df["Adherence"] = df["Actual_End_Date"] <= df["Planned_End_Date"]
+
+# App setup
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app.title = "Project Schedule Adherence Dashboard"
+
+# Layout
+app.layout = dbc.Container([
+    html.H2("📊 Project Schedule Adherence Dashboard", className="text-center my-4"),
+
+    dbc.Row([
+        dbc.Col(dbc.Card([
+            dbc.CardBody([
+                html.H5("Total Tasks", className="card-title"),
+                html.H3(len(df), className="card-text")
+            ])
+        ]), width=4),
+
+        dbc.Col(dbc.Card([
+            dbc.CardBody([
+                html.H5("Tasks On Schedule", className="card-title"),
+                html.H3(df["Adherence"].sum(), className="card-text")
+            ])
+        ]), width=4),
+
+        dbc.Col(dbc.Card([
+            dbc.CardBody([
+                html.H5("Schedule Adherence (%)", className="card-title"),
+                html.H3(f"{(df['Adherence'].mean()*100):.2f}%", className="card-text")
+            ])
+        ]), width=4),
+    ], className="mb-4"),
+
+    dcc.Graph(
+        figure=px.bar(df, x="Task", y=["Planned_Duration", "Actual_Duration"],
+                      barmode="group", title="Planned vs Actual Duration per Task")
+    ),
+
+    dcc.Graph(
+        figure=px.timeline(df, x_start="Start_Date", x_end="Actual_End_Date", y="Task", color="Adherence",
+                           title="Gantt Chart with Schedule Adherence")
+               .update_yaxes(autorange="reversed")
+    )
+], fluid=True)
+
+# Run the app
+if __name__ == "__main__":
+    app.run_server(debug=True)
